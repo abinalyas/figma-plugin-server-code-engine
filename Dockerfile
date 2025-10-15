@@ -8,7 +8,7 @@ WORKDIR /app
 COPY server-package.json package.json
 
 # Install production dependencies only
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy the proxy server code
 COPY proxy-server.js ./
