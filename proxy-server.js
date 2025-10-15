@@ -10,6 +10,14 @@ const PROJECT_ID = process.env.PROJECT_ID || 'ca5f429d-c12e-457d-a17f-d3ba1aeb50
 const MODEL_ID = 'ibm/granite-3-3-8b-instruct';
 const WATSON_API_KEY = process.env.WATSON_API_KEY;
 
+// Debug logging
+console.log('=== ENVIRONMENT VARIABLES DEBUG ===');
+console.log('WATSON_API_KEY exists:', !!WATSON_API_KEY);
+console.log('WATSON_API_KEY length:', WATSON_API_KEY ? WATSON_API_KEY.length : 0);
+console.log('WATSON_API_KEY first 10 chars:', WATSON_API_KEY ? WATSON_API_KEY.substring(0, 10) + '...' : 'undefined');
+console.log('PROJECT_ID:', PROJECT_ID);
+console.log('=====================================');
+
 app.use(cors());
 app.use(express.json());
 
@@ -18,6 +26,13 @@ app.post('/token', async (req, res) => {
   try {
     // Use API key from environment variable or request body
     const apiKey = WATSON_API_KEY || req.body.apiKey;
+    
+    console.log('=== TOKEN ENDPOINT DEBUG ===');
+    console.log('WATSON_API_KEY from env:', !!WATSON_API_KEY);
+    console.log('apiKey from request body:', !!req.body.apiKey);
+    console.log('Final apiKey to use:', !!apiKey);
+    console.log('apiKey length:', apiKey ? apiKey.length : 0);
+    console.log('============================');
     
     const tokenRes = await fetch('https://iam.cloud.ibm.com/identity/token', {
       method: 'POST',
