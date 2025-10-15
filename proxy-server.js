@@ -5,10 +5,10 @@ const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Fixed configuration
-// TODO: Replace with your actual Watson project ID from https://dataplatform.cloud.ibm.com/
-const PROJECT_ID = 'ca5f429d-c12e-457d-a17f-d3ba1aeb5044'; // <-- UPDATE THIS WITH YOUR PROJECT ID
+// Configuration from environment variables
+const PROJECT_ID = process.env.PROJECT_ID || 'ca5f429d-c12e-457d-a17f-d3ba1aeb5044';
 const MODEL_ID = 'ibm/granite-3-3-8b-instruct';
+const WATSON_API_KEY = process.env.WATSON_API_KEY;
 
 app.use(cors());
 app.use(express.json());
@@ -16,7 +16,8 @@ app.use(express.json());
 // Proxy endpoint for getting IAM token
 app.post('/token', async (req, res) => {
   try {
-    const { apiKey } = req.body;
+    // Use API key from environment variable or request body
+    const apiKey = WATSON_API_KEY || req.body.apiKey;
     
     const tokenRes = await fetch('https://iam.cloud.ibm.com/identity/token', {
       method: 'POST',
