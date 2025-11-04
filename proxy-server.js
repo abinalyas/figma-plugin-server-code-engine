@@ -19,7 +19,7 @@ console.log('PROJECT_ID:', PROJECT_ID);
 console.log('=====================================');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '200kb' }));
 
 // Proxy endpoint for getting IAM token
 app.post('/token', async (req, res) => {
@@ -471,10 +471,45 @@ Prompt context: ${prompt}`;
   }
 });
 
+app.post('/analytics', async (req, res) => {
+  try {
+    const { event, anonId, props, ts } = req.body || {};
+    
+    if (process.env.GA4_MEASUREMENT_ID && process.env.GA4_API_SECRET) {
+      const ga4Url = `https://www.google-analytics.com/mp/collect?measurement_id=${process.env.GA4_MEASUREMENT_ID}&api_secret=${process.env.GA4_API_SECRET}`;
+      const ga4Payload = {
+        client_id: anonId || 'anon',
+        timestamp_micros: ts ? String(ts * 1000) : undefined,
+        events: [{ name: event || 'event', params: props || {} }],
+      };
+      
+      const ga4Res = await fetch(ga4Url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ga4Payload),
+      });
+      
+      if (ga4Res.ok) {
+        console.log(`[analytics] ✅ Sent event "${event}" to GA4`);
+      } else {
+        console.warn(`[analytics] ⚠️ GA4 responded with status ${ga4Res.status}`);
+      }
+    } else {
+      console.log('[analytics] (dev) event', { event, anonId, props, ts });
+    }
+  } catch (e) {
+    console.warn('[analytics] forward failed', e);
+  } finally {
+    res.sendStatus(204);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Proxy server running on http://localhost:${PORT}`);
   console.log('Available endpoints:');
   console.log('  POST /token - Get IAM access token');
   console.log('  POST /generate - Generate text with watsonx.ai');
   console.log('  POST /generateTable - Generate headers + rows with watsonx.ai');
+  console.log('  POST /analytics - Forward analytics events to GA4');
+  console.log(`GA4 Analytics: ${process.env.GA4_MEASUREMENT_ID ? '✅ Configured' : '⚠️ Not configured (dev mode)'}`);
 });
