@@ -477,10 +477,25 @@ app.post('/analytics', async (req, res) => {
     
     if (process.env.GA4_MEASUREMENT_ID && process.env.GA4_API_SECRET) {
       const ga4Url = `https://www.google-analytics.com/mp/collect?measurement_id=${process.env.GA4_MEASUREMENT_ID}&api_secret=${process.env.GA4_API_SECRET}`;
+      
+      // Get client IP for geographic tracking (GA4 will infer location from server IP)
+      const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0] || 'unknown';
+      
       const ga4Payload = {
         client_id: anonId || 'anon',
+        user_id: props?.user_id || anonId || undefined, // Use user_id for unique user tracking
         timestamp_micros: ts ? String(ts * 1000) : undefined,
-        events: [{ name: event || 'event', params: props || {} }],
+        events: [{
+          name: event || 'event',
+          params: {
+            ...props,
+            // Ensure user_id is set for unique user tracking
+            user_id: props?.user_id || anonId || undefined,
+            // Add session info if available
+            session_id: props?.session_id || anonId + '_' + Math.floor(ts / (1000 * 60 * 30)), // 30-min sessions
+            // Note: GA4 will automatically infer geographic location from server IP
+          }
+        }],
       };
       
       const ga4Res = await fetch(ga4Url, {
@@ -490,9 +505,10 @@ app.post('/analytics', async (req, res) => {
       });
       
       if (ga4Res.ok) {
-        console.log(`[analytics] ✅ Sent event "${event}" to GA4`);
+        console.log(`[analytics] ✅ Sent event "${event}" to GA4 (user: ${anonId?.substring(0, 8)}...)`);
       } else {
-        console.warn(`[analytics] ⚠️ GA4 responded with status ${ga4Res.status}`);
+        const errorText = await ga4Res.text();
+        console.warn(`[analytics] ⚠️ GA4 responded with status ${ga4Res.status}: ${errorText}`);
       }
     } else {
       console.log('[analytics] (dev) event', { event, anonId, props, ts });
