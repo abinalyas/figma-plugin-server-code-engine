@@ -478,13 +478,25 @@ app.post('/analytics', async (req, res) => {
     if (process.env.GA4_MEASUREMENT_ID && process.env.GA4_API_SECRET) {
       const ga4Url = `https://www.google-analytics.com/mp/collect?measurement_id=${process.env.GA4_MEASUREMENT_ID}&api_secret=${process.env.GA4_API_SECRET}`;
       
-      // Get client IP for geographic tracking (GA4 will infer location from server IP)
-      const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0] || 'unknown';
+      // Get client IP for geographic tracking
+      // Note: X-Forwarded-For header may contain the original client IP from Code Engine
+      const forwardedFor = req.headers['x-forwarded-for'];
+      const clientIp = forwardedFor ? forwardedFor.split(',')[0].trim() : 
+                       req.ip || 
+                       req.connection?.remoteAddress || 
+                       req.socket?.remoteAddress || 
+                       'unknown';
+      
+      // Ensure timestamp is in UTC microseconds (GA4 expects UTC)
+      // Date.now() returns UTC milliseconds, convert to microseconds
+      const utcTimestamp = ts ? String(ts * 1000) : String(Date.now() * 1000);
       
       const ga4Payload = {
         client_id: anonId || 'anon',
         user_id: props?.user_id || anonId || undefined, // Use user_id for unique user tracking
-        timestamp_micros: ts ? String(ts * 1000) : undefined,
+        timestamp_micros: utcTimestamp, // UTC microseconds since epoch
+        // Try to use IP override if available (may not work for all GA4 setups)
+        ...(clientIp !== 'unknown' && { ip_override: clientIp }),
         events: [{
           name: event || 'event',
           params: {
@@ -492,8 +504,10 @@ app.post('/analytics', async (req, res) => {
             // Ensure user_id is set for unique user tracking
             user_id: props?.user_id || anonId || undefined,
             // Add session info if available
-            session_id: props?.session_id || anonId + '_' + Math.floor(ts / (1000 * 60 * 30)), // 30-min sessions
-            // Note: GA4 will automatically infer geographic location from server IP
+            session_id: props?.session_id || anonId + '_' + Math.floor((ts || Date.now()) / (1000 * 60 * 30)), // 30-min sessions
+            // Add timezone info for debugging (optional)
+            server_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            server_time: new Date(ts || Date.now()).toISOString(),
           }
         }],
       };
